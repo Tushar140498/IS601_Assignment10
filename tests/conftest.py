@@ -21,6 +21,7 @@ from uuid import uuid4
 
 # Third-party imports
 import pytest
+import uuid
 from fastapi.testclient import TestClient
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
@@ -210,13 +211,12 @@ async def manager_user(db_session: AsyncSession):
     await db_session.commit()
     return user
 
-
 # Fixtures for common test data
 @pytest.fixture
 def user_base_data():
     return {
-        "email": "john.doe@example.com",
         "nickname": "john_doe",
+        "email": "john.doe@example.com",
         "first_name": "John",
         "last_name": "Doe",
         "bio": "I am a software engineer with over 5 years of experience.",
@@ -225,42 +225,44 @@ def user_base_data():
         "github_profile_url": "https://github.com/johndoe"
     }
 
-
 @pytest.fixture
 def user_base_data_invalid():
     return {
-        "username": "john_doe_123",
-        "email": "john.doe.example.com",
-        "full_name": "John Doe",
+        "nickname": "john_doe",
+        "email": "john.doe.example.com",  # Invalid email
+        "first_name": "John",
+        "last_name": "Doe",
         "bio": "I am a software engineer with over 5 years of experience.",
-        "profile_picture_url": "https://example.com/profile_pictures/john_doe.jpg"
+        "profile_picture_url": "https://example.com/profile_pictures/john_doe.jpg",
+        "linkedin_profile_url": "https://linkedin.com/in/johndoe",
+        "github_profile_url": "https://github.com/johndoe"
     }
-
 
 @pytest.fixture
 def user_create_data(user_base_data):
-    return {**user_base_data, "password": "SecurePassword123!"}
+    return {
+        **user_base_data,
+        "nickname": "john_doe", 
+        "password": "Secure*1234"
+    }
 
 @pytest.fixture
 def user_update_data():
     return {
         "email": "john.doe.new@example.com",
-        "nickname": "johnny123",
+        "nickname": "john_updated",
         "first_name": "John",
-        "last_name": "Doe",
+        "last_name": "Updated",
         "bio": "I specialize in backend development with Python and Node.js.",
         "profile_picture_url": "https://example.com/profile_pictures/john_doe_updated.jpg",
-        "linkedin_profile_url": "https://linkedin.com/in/johnny",
-        "github_profile_url": "https://github.com/johnny"
+        "linkedin_profile_url": "https://linkedin.com/in/johndoe",
+        "github_profile_url": "https://github.com/johndoe"
     }
-
 
 @pytest.fixture
 def user_response_data():
-    import uuid
-    from datetime import datetime
     return {
-        "id": uuid.uuid4(),  # This must be a valid UUID
+        "id": uuid.uuid4(),
         "email": "test@example.com",
         "nickname": "jane_doe",
         "first_name": "Jane",
@@ -270,14 +272,12 @@ def user_response_data():
         "linkedin_profile_url": "https://linkedin.com/in/janedoe",
         "github_profile_url": "https://github.com/janedoe",
         "role": "AUTHENTICATED",
-        "is_professional": True,
-        "last_login_at": datetime.utcnow()
+        "is_professional": True
     }
-
 
 @pytest.fixture
 def login_request_data():
     return {
         "email": "john.doe@example.com",
-        "password": "SecurePassword123!"
+        "password": "Secure*1234"
     }
