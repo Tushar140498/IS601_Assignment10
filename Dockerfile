@@ -1,10 +1,7 @@
-# Use an official lightweight Python image.
-# 3.12-slim variant is chosen for a balance between size and utility.
+# Use an official lightweight Python image
 FROM python:3.12-slim-bullseye as base
 
-# Set environment variables to configure Python and pip.
-# Prevents Python from buffering stdout and stderr, enables the fault handler, disables pip cache,
-# sets default pip timeout, and suppresses pip version check messages.
+# Environment settings
 ENV PYTHONUNBUFFERED=1 \
     PYTHONFAULTHANDLER=1 \
     PIP_NO_CACHE_DIR=true \
@@ -12,31 +9,31 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=on \
     QR_CODE_DIR=/myapp/qr_codes
 
-# Set the working directory inside the container
+# Set the working directory
 WORKDIR /myapp
 
-# Install system dependencies
+# Install required system dependencies
 RUN apt-get update \
     && apt-get install -y --no-install-recommends gcc libpq-dev \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy only the requirements, to cache them in Docker layer
-COPY ./requirements.txt /myapp/requirements.txt
+# Copy and install dependencies
+COPY ./requirements.txt .
 
-# Upgrade pip and install Python dependencies from requirements file
+# 🚨 Important: Force reinstall to guarantee update
 RUN pip install --upgrade pip \
-    && pip install -r requirements.txt
+    && pip install --no-cache-dir --force-reinstall -r requirements.txt
 
-# Add a non-root user and switch to it
+# Add a non-root user and switch
 RUN useradd -m myuser
 USER myuser
 
-# Copy the rest of your application's code with appropriate ownership
-COPY --chown=myuser:myuser . /myapp
+# Now copy all the app code (AFTER requirements to keep cache intact)
+COPY --chown=myuser:myuser . .
 
-# Inform Docker that the container listens on the specified port at runtime.
+# Expose the service port
 EXPOSE 8000
 
-# Use ENTRYPOINT to specify the executable when the container starts.
+# Entry point
 ENTRYPOINT ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
