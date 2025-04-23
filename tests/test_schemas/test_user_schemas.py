@@ -26,7 +26,7 @@ def test_user_update_valid(user_update_data):
 def test_user_response_valid(user_response_data):
     user = UserResponse(**user_response_data)
     assert user.id == user_response_data["id"]
-    # assert user.last_login_at == user_response_data["last_login_at"]
+    assert user.last_login_at == user_response_data["last_login_at"]
 
 # Tests for LoginRequest
 def test_login_request_valid(login_request_data):
@@ -60,22 +60,21 @@ def test_user_base_url_invalid(url, user_base_data):
     with pytest.raises(ValidationError):
         UserBase(**user_base_data)
 
-# Tests for UserBase
+# Tests for UserBase invalid email
 def test_user_base_invalid_email(user_base_data_invalid):
     with pytest.raises(ValidationError) as exc_info:
         user = UserBase(**user_base_data_invalid)
-    
     assert "value is not a valid email address" in str(exc_info.value)
     assert "john.doe.example.com" in str(exc_info.value)
 
-
+# Schema example data match between registration and login
 def test_user_create_and_login_example_match():
     user_create_schema = UserCreate.schema()
     login_schema = LoginRequest.schema()
-    
     assert user_create_schema['properties']['email']['example'] == login_schema['properties']['email']['example']
     assert user_create_schema['properties']['password']['example'] == login_schema['properties']['password']['example']
 
+# Password validation tests
 @pytest.mark.parametrize("bad_password", [
     "short",               # too short
     "nocapital123!",       # no uppercase
@@ -92,3 +91,21 @@ def test_user_create_valid_password(user_base_data):
     data = {**user_base_data, "password": "ValidPass123!"}
     user = UserCreate(**data)
     assert user.password == "ValidPass123!"
+
+# Whitespace stripping validation
+def test_user_base_strips_whitespace(user_base_data):
+    user_base_data["first_name"] = "  John  "
+    user_base_data["last_name"] = "  Doe "
+    user_base_data["nickname"] = " john_doe "
+    user_base_data["bio"] = "  Backend dev  "
+    user_base_data["linkedin_profile_url"] = "  https://linkedin.com/in/johndoe  "
+    user_base_data["github_profile_url"] = "  https://github.com/johndoe  "
+    
+    user = UserBase(**user_base_data)
+
+    assert user.first_name == "John"
+    assert user.last_name == "Doe"
+    assert user.nickname == "john_doe"
+    assert user.bio == "Backend dev"
+    assert user.linkedin_profile_url == "https://linkedin.com/in/johndoe"
+    assert user.github_profile_url == "https://github.com/johndoe"

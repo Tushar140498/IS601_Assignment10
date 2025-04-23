@@ -28,4 +28,3 @@ async def exception_handler(request, exc):
 
 app.include_router(user_routes.router)
 
-

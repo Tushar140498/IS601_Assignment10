@@ -4,6 +4,23 @@ from sqlalchemy import select
 from app.dependencies import get_settings
 from app.models.user_model import User
 from app.services.user_service import UserService
+from unittest.mock import patch
+from app.services.email_service import EmailService
+from app.utils.template_manager import TemplateManager
+import smtplib
+from app.utils.smtp_connection import SMTPClient
+from types import SimpleNamespace
+
+
+class DummyTemplateManager:
+    def render_template(self, template_name, **kwargs):
+        return "This is a test email."
+
+class DummySMTPClient:
+    def send_email(self, subject, html_content, to_email):
+        assert subject == "Verify Your Account"
+        assert html_content == "This is a test email."
+        assert to_email == "test@example.com"
 
 pytestmark = pytest.mark.asyncio
 
@@ -89,8 +106,10 @@ async def test_list_users_with_pagination(db_session, users_with_same_role_50_us
     assert len(users_page_2) == 10
     assert users_page_1[0].id != users_page_2[0].id
 
-# Test registering a user with valid data
-async def test_register_user_with_valid_data(db_session, email_service):
+
+# Test registering a user with valid data (mocking email sending)
+@patch("app.services.email_service.EmailService.send_verification_email", return_value=None)
+async def test_register_user_with_valid_data(mock_send, db_session, email_service):
     user_data = {
         "email": "register_valid_user@example.com",
         "password": "RegisterValid123!",
@@ -98,6 +117,8 @@ async def test_register_user_with_valid_data(db_session, email_service):
     user = await UserService.register_user(db_session, user_data, email_service)
     assert user is not None
     assert user.email == user_data["email"]
+    mock_send.assert_called_once()
+
 
 # Test attempting to register a user with invalid data
 async def test_register_user_with_invalid_data(db_session, email_service):
@@ -156,3 +177,94 @@ async def test_unlock_user_account(db_session, locked_user):
     assert unlocked, "The account should be unlocked"
     refreshed_user = await UserService.get_by_id(db_session, locked_user.id)
     assert not refreshed_user.is_locked, "The user should no longer be locked"
+
+@pytest.mark.asyncio
+@patch("app.services.email_service.EmailService.send_verification_email", return_value=None)
+async def test_create_user_with_valid_data(mock_send, db_session, email_service):
+    user_data = {
+        "email": "valid_user@example.com",
+        "password": "ValidPassword123!",
+    }
+    user = await UserService.create(db_session, user_data, email_service)
+    mock_send.assert_called_once()
+
+@pytest.mark.asyncio
+async def test_send_user_email_should_call_smtp(monkeypatch):
+    class FakeSMTP:
+        def send_email(self, subject, html_content, to_email):
+            assert subject == "Verify Your Account"
+            assert "Hello Test" in html_content
+            assert "http://example.com/verify" in html_content
+            assert to_email == "test@example.com"
+
+    email_service = EmailService(template_manager=TemplateManager())
+    email_service.smtp_client = FakeSMTP()
+
+    user_data = {
+        "email": "test@example.com",
+        "first_name": "Test",
+        "last_name": "User",
+        "name": "Test",
+        "verification_url": "http://example.com/verify"
+    }
+
+    await email_service.send_user_email(user_data, "email_verification")
+
+@pytest.mark.asyncio
+async def test_send_user_email_invalid_type():
+    email_service = EmailService(template_manager=TemplateManager())
+    user_data = {
+        "email": "test@example.com",
+        "name": "Test"
+    }
+    with pytest.raises(ValueError, match="Invalid email type"):
+        await email_service.send_user_email(user_data, "invalid_type")
+
+@pytest.mark.asyncio
+async def test_send_user_email_valid_case(monkeypatch):
+    email_service = EmailService(template_manager=DummyTemplateManager())
+    email_service.smtp_client = DummySMTPClient()
+    user_data = {
+        "email": "test@example.com",
+        "name": "Test",
+        "verification_url": "http://example.com/verify"
+    }
+    await email_service.send_user_email(user_data, "email_verification")
+
+@pytest.mark.asyncio
+async def test_send_verification_email(monkeypatch):
+    class FakeSMTP:
+        def send_email(self, subject, html_content, to_email):
+            assert subject == "Verify Your Account"
+            assert "verify-email/123/abc" in html_content
+            assert to_email == "test@example.com"
+
+    email_service = EmailService(template_manager=TemplateManager())
+    email_service.smtp_client = FakeSMTP()
+
+    fake_user = SimpleNamespace(
+        first_name="Test",
+        email="test@example.com",
+        id="123",
+        verification_token="abc"
+    )
+
+    await email_service.send_verification_email(fake_user)
+
+def test_smtp_send_fails(monkeypatch):
+    class FakeSMTP:
+        def __init__(self, host, port): pass
+        def ehlo(self): pass
+        def starttls(self): pass
+        def login(self, user, pwd): pass
+        def sendmail(self, from_addr, to_addrs, msg): raise smtplib.SMTPException("Fail")
+        def quit(self): pass
+        def __enter__(self): return self
+        def __exit__(self, exc_type, exc_val, exc_tb): pass
+
+    monkeypatch.setattr(smtplib, "SMTP", FakeSMTP)
+
+    smtp = SMTPClient("smtp.example.com", 587, "user", "pass")
+
+    with pytest.raises(smtplib.SMTPException, match="Fail"):
+        smtp.send_email("Subject", "Body", "to@example.com")
