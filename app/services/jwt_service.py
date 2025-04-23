@@ -8,7 +8,9 @@ def create_access_token(*, data: dict, expires_delta: timedelta = None):
     to_encode = data.copy()
     # Convert role to uppercase before encoding the JWT
     if 'role' in to_encode:
-        to_encode['role'] = to_encode['role'].upper()
+        role_value = to_encode['role']
+        to_encode['role'] = role_value.value.upper() if hasattr(role_value, 'value') else role_value.upper()
+
     expire = datetime.utcnow() + (expires_delta if expires_delta else timedelta(minutes=settings.access_token_expire_minutes))
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
