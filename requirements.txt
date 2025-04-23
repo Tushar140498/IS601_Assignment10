@@ -61,3 +61,7 @@ uvicorn==0.29.0
 validators==0.24.0
 markdown2
 pyjwt
+gunicorn==23.0.0
+PyMySQL==1.1.1
+python-jose==3.4.0
+python-multipart==0.0.18
