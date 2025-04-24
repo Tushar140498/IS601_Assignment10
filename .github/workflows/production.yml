@@ -70,7 +70,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           push: true
-          tags: tushar140498/IS601_Assignment10:${{ github.sha }}
+          tags: tushar140498/assignment10:${{ github.sha }}
           platforms: linux/amd64,linux/arm64
           cache-from: type=registry,ref=tushar140498/IS601_Assignment10:cache
           cache-to: type=inline,mode=max
@@ -78,7 +78,7 @@ jobs:
       - name: Scan the Docker image
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: 'tushar140498/IS601_Assignment10:${{ github.sha }}'
+          image-ref: 'tushar140498/assignment10:${{ github.sha }}'
           format: 'table'
           exit-code: '1'
           ignore-unfixed: true
